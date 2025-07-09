@@ -1,21 +1,20 @@
-# Variables for vSphere Tanzu Kubernetes Infrastructure
-# Configure these values according to your environment
+# Variables for Tanzu Kubernetes Infrastructure Terraform configuration
 
-# vSphere Connection Configuration
+# vSphere Connection Variables
 variable "vsphere_server" {
-  description = "vSphere server endpoint"
+  description = "vCenter server FQDN or IP address"
   type        = string
   sensitive   = true
 }
 
 variable "vsphere_username" {
-  description = "vSphere username"
+  description = "vCenter username"
   type        = string
   sensitive   = true
 }
 
 variable "vsphere_password" {
-  description = "vSphere password"
+  description = "vCenter password"
   type        = string
   sensitive   = true
 }
@@ -26,7 +25,7 @@ variable "allow_unverified_ssl" {
   default     = true
 }
 
-# vSphere Infrastructure Configuration
+# vSphere Infrastructure Variables
 variable "vsphere_datacenter" {
   description = "vSphere datacenter name"
   type        = string
@@ -47,146 +46,67 @@ variable "vsphere_network" {
   type        = string
 }
 
-variable "vm_template" {
-  description = "VM template name for Kubernetes nodes"
+variable "vsphere_resource_pool" {
+  description = "vSphere resource pool name"
   type        = string
-  default     = "ubuntu-20.04-kubernetes-v1.25.4"
+  default     = "Resources"
 }
 
-variable "resource_pool_name" {
-  description = "Resource pool name for Tanzu clusters"
+variable "vsphere_folder" {
+  description = "vSphere VM folder"
   type        = string
-  default     = "tanzu-resource-pool"
+  default     = "tanzu-kubernetes"
 }
 
-variable "vm_folder_name" {
-  description = "VM folder name for Tanzu clusters"
+# Environment Configuration
+variable "environment" {
+  description = "Environment name (dev, prod, mgmt)"
   type        = string
-  default     = "tanzu-vms"
-}
-
-# Common tags for all resources
-variable "common_tags" {
-  description = "Common tags to apply to all resources"
-  type        = map(string)
-  default = {
-    Environment = "production"
-    Project     = "tanzu-kubernetes"
-    Owner       = "platform-team"
-    ManagedBy   = "terraform"
+  default     = "dev"
+  
+  validation {
+    condition     = contains(["dev", "prod", "mgmt"], var.environment)
+    error_message = "Environment must be one of: dev, prod, mgmt."
   }
 }
 
-# Network Configuration
-variable "network_config" {
-  description = "Network configuration for Tanzu clusters"
-  type = object({
-    cluster_cidr          = string
-    service_cidr          = string
-    pod_cidr              = string
-    dns_servers           = list(string)
-    ntp_servers           = list(string)
-    proxy_config          = optional(object({
-      http_proxy  = string
-      https_proxy = string
-      no_proxy    = string
-    }))
-    load_balancer_config = object({
-      ip_pool_start = string
-      ip_pool_end   = string
-    })
-  })
-  default = {
-    cluster_cidr = "10.96.0.0/12"
-    service_cidr = "10.96.0.0/12"
-    pod_cidr     = "192.168.0.0/16"
-    dns_servers  = ["8.8.8.8", "8.8.4.4"]
-    ntp_servers  = ["pool.ntp.org"]
-    load_balancer_config = {
-      ip_pool_start = "10.10.1.100"
-      ip_pool_end   = "10.10.1.200"
-    }
-  }
+# Tanzu Configuration
+variable "tanzu_version" {
+  description = "Tanzu Kubernetes release version"
+  type        = string
+  default     = "v1.25.7+vmware.2-tkg.1"
 }
 
-# Storage Configuration
-variable "storage_config" {
-  description = "Storage configuration for Tanzu clusters"
-  type = object({
-    storage_class     = string
-    storage_policy    = string
-    default_disk_size = string
-    reclaim_policy    = string
-  })
-  default = {
-    storage_class     = "tanzu-storage-class"
-    storage_policy    = "tanzu-storage-policy"
-    default_disk_size = "20Gi"
-    reclaim_policy    = "Delete"
-  }
-}
-
-# Security Configuration
-variable "security_config" {
-  description = "Security configuration for Tanzu clusters"
-  type = object({
-    enable_pod_security_standards = bool
-    enable_network_policies       = bool
-    enable_admission_controllers  = bool
-    image_registry_config = object({
-      registry_url = string
-      username     = string
-      password     = string
-    })
-  })
-  default = {
-    enable_pod_security_standards = true
-    enable_network_policies       = true
-    enable_admission_controllers  = true
-    image_registry_config = {
-      registry_url = "registry.tanzu.vmware.com"
-      username     = ""
-      password     = ""
-    }
-  }
+variable "kubernetes_version" {
+  description = "Kubernetes version"
+  type        = string
+  default     = "v1.25.7+vmware.2"
 }
 
 # Management Cluster Configuration
 variable "management_cluster_config" {
   description = "Management cluster configuration"
   type = object({
-    cluster_name        = string
-    kubernetes_version  = string
-    control_plane_count = number
-    worker_count        = number
-    control_plane_vm_config = object({
-      num_cpus          = number
-      memory_mb         = number
-      disk_size_gb      = number
-    })
-    worker_vm_config = object({
-      num_cpus          = number
-      memory_mb         = number
-      disk_size_gb      = number
-    })
-    cluster_class = string
+    name                 = string
+    control_plane_count  = number
+    worker_count         = number
+    control_plane_cpu    = number
+    control_plane_memory = number
+    control_plane_disk   = number
+    worker_cpu           = number
+    worker_memory        = number
+    worker_disk          = number
   })
   default = {
-    cluster_name        = "mgmt-cluster"
-    kubernetes_version  = "v1.25.4+vmware.1"
-    control_plane_count = 3
-    worker_count        = 2
-    control_plane_vm_config = {
-      num_cpus     = 4
-      memory_mb    = 8192
-      disk_size_gb = 40
-    }
-    worker_vm_config = {
-      num_cpus     = 4
-      memory_mb    = 8192
-      disk_size_gb = 40
-    }
-    cluster_class = "tkg-vsphere-default-v1.0.0"
+    name                 = "mgmt-cluster"
+    control_plane_count  = 3
+    worker_count         = 2
+    control_plane_cpu    = 4
+    control_plane_memory = 8192
+    control_plane_disk   = 40
+    worker_cpu           = 4
+    worker_memory        = 8192
+    worker_disk          = 40
   }
 }
 
@@ -194,38 +114,26 @@ variable "management_cluster_config" {
 variable "dev_cluster_config" {
   description = "Development cluster configuration"
   type = object({
-    cluster_name        = string
-    kubernetes_version  = string
-    control_plane_count = number
-    worker_count        = number
-    control_plane_vm_config = object({
-      num_cpus          = number
-      memory_mb         = number
-      disk_size_gb      = number
-    })
-    worker_vm_config = object({
-      num_cpus          = number
-      memory_mb         = number
-      disk_size_gb      = number
-    })
-    cluster_class = string
+    name                 = string
+    control_plane_count  = number
+    worker_count         = number
+    control_plane_cpu    = number
+    control_plane_memory = number
+    control_plane_disk   = number
+    worker_cpu           = number
+    worker_memory        = number
+    worker_disk          = number
   })
   default = {
-    cluster_name        = "dev-cluster"
-    kubernetes_version  = "v1.25.4+vmware.1"
-    control_plane_count = 3
-    worker_count        = 3
-    control_plane_vm_config = {
-      num_cpus     = 2
-      memory_mb    = 4096
-      disk_size_gb = 20
-    }
-    worker_vm_config = {
-      num_cpus     = 4
-      memory_mb    = 8192
-      disk_size_gb = 40
-    }
-    cluster_class = "tkg-vsphere-default-v1.0.0"
+    name                 = "dev-cluster"
+    control_plane_count  = 3
+    worker_count         = 3
+    control_plane_cpu    = 2
+    control_plane_memory = 4096
+    control_plane_disk   = 20
+    worker_cpu           = 2
+    worker_memory        = 4096
+    worker_disk          = 20
   }
 }
 
@@ -233,37 +141,130 @@ variable "dev_cluster_config" {
 variable "prod_cluster_config" {
   description = "Production cluster configuration"
   type = object({
-    cluster_name        = string
-    kubernetes_version  = string
-    control_plane_count = number
-    worker_count        = number
-    control_plane_vm_config = object({
-      num_cpus          = number
-      memory_mb         = number
-      disk_size_gb      = number
-    })
-    worker_vm_config = object({
-      num_cpus          = number
-      memory_mb         = number
-      disk_size_gb      = number
-    })
-    cluster_class = string
+    name                 = string
+    control_plane_count  = number
+    worker_count         = number
+    control_plane_cpu    = number
+    control_plane_memory = number
+    control_plane_disk   = number
+    worker_cpu           = number
+    worker_memory        = number
+    worker_disk          = number
   })
   default = {
-    cluster_name        = "prod-cluster"
-    kubernetes_version  = "v1.25.4+vmware.1"
-    control_plane_count = 3
-    worker_count        = 3
-    control_plane_vm_config = {
-      num_cpus     = 4
-      memory_mb    = 8192
-      disk_size_gb = 40
-    }
-    worker_vm_config = {
-      num_cpus     = 8
-      memory_mb    = 16384
-      disk_size_gb = 80
-    }
-    cluster_class = "tkg-vsphere-default-v1.0.0"
+    name                 = "prod-cluster"
+    control_plane_count  = 3
+    worker_count         = 3
+    control_plane_cpu    = 4
+    control_plane_memory = 8192
+    control_plane_disk   = 40
+    worker_cpu           = 4
+    worker_memory        = 8192
+    worker_disk          = 40
   }
+}
+
+# Networking Configuration
+variable "network_config" {
+  description = "Network configuration for clusters"
+  type = object({
+    service_cidr   = string
+    pod_cidr       = string
+    service_domain = string
+  })
+  default = {
+    service_cidr   = "10.96.0.0/12"
+    pod_cidr       = "192.168.0.0/16"
+    service_domain = "cluster.local"
+  }
+}
+
+# Storage Configuration
+variable "storage_config" {
+  description = "Storage configuration"
+  type = object({
+    storage_class      = string
+    volume_binding_mode = string
+    reclaim_policy     = string
+  })
+  default = {
+    storage_class       = "vsphere-csi"
+    volume_binding_mode = "WaitForFirstConsumer"
+    reclaim_policy      = "Delete"
+  }
+}
+
+# Security Configuration
+variable "security_config" {
+  description = "Security configuration"
+  type = object({
+    enable_pod_security_standards = bool
+    enable_network_policies      = bool
+    enable_rbac                  = bool
+    enable_admission_controllers = bool
+  })
+  default = {
+    enable_pod_security_standards = true
+    enable_network_policies      = true
+    enable_rbac                  = true
+    enable_admission_controllers = true
+  }
+}
+
+# Monitoring Configuration
+variable "monitoring_config" {
+  description = "Monitoring configuration"
+  type = object({
+    enable_prometheus = bool
+    enable_grafana   = bool
+    enable_alerting  = bool
+    retention_days   = number
+  })
+  default = {
+    enable_prometheus = true
+    enable_grafana   = true
+    enable_alerting  = true
+    retention_days   = 30
+  }
+}
+
+# GitOps Configuration
+variable "gitops_config" {
+  description = "GitOps configuration"
+  type = object({
+    enable_argocd = bool
+    enable_flux   = bool
+    git_repo_url  = string
+    git_branch    = string
+  })
+  default = {
+    enable_argocd = true
+    enable_flux   = false
+    git_repo_url  = "https://github.com/PeterZhang2015/testTkgInfraWithAIAgent1.git"
+    git_branch    = "master"
+  }
+}
+
+# Backup Configuration
+variable "backup_config" {
+  description = "Backup configuration"
+  type = object({
+    enable_velero    = bool
+    enable_etcd_backup = bool
+    backup_schedule    = string
+    retention_days     = number
+  })
+  default = {
+    enable_velero      = true
+    enable_etcd_backup = true
+    backup_schedule    = "0 2 * * *"
+    retention_days     = 30
+  }
+}
+
+# Additional Tags
+variable "additional_tags" {
+  description = "Additional tags to apply to resources"
+  type        = map(string)
+  default     = {}
 }
