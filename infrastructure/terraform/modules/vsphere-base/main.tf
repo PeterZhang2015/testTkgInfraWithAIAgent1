@@ -1,16 +1,7 @@
-# vSphere Base Infrastructure Module
-# This module provides foundational vSphere infrastructure components
+# vSphere Base Module
+# This module creates the foundational vSphere resources for Tanzu Kubernetes Grid
 
-terraform {
-  required_providers {
-    vsphere = {
-      source  = "hashicorp/vsphere"
-      version = "~> 2.4"
-    }
-  }
-}
-
-# Variables
+# Input variables
 variable "datacenter_id" {
   description = "vSphere datacenter ID"
   type        = string
@@ -21,8 +12,8 @@ variable "datastore_id" {
   type        = string
 }
 
-variable "resource_pool_id" {
-  description = "vSphere resource pool ID"
+variable "cluster_id" {
+  description = "vSphere cluster ID"
   type        = string
 }
 
@@ -36,217 +27,170 @@ variable "template_id" {
   type        = string
 }
 
-variable "vm_folder_id" {
-  description = "VM folder ID"
+variable "resource_pool_name" {
+  description = "Name of the resource pool to create"
   type        = string
 }
 
-variable "environment" {
-  description = "Environment name"
+variable "vm_folder_name" {
+  description = "Name of the VM folder to create"
   type        = string
 }
 
 variable "common_tags" {
-  description = "Common tags for all resources"
+  description = "Common tags to apply to all resources"
   type        = map(string)
   default     = {}
 }
 
-# Data sources for additional vSphere resources
-data "vsphere_host" "esxi_hosts" {
+# Create resource pool for Tanzu clusters
+resource "vsphere_resource_pool" "tanzu_resource_pool" {
+  name                    = var.resource_pool_name
+  parent_resource_pool_id = var.cluster_id
+  
+  cpu_share_level         = "normal"
+  cpu_limit               = -1
+  cpu_reservation         = 0
+  cpu_expandable          = true
+  
+  memory_share_level      = "normal"
+  memory_limit            = -1
+  memory_reservation      = 0
+  memory_expandable       = true
+  
+  tags = var.common_tags
+}
+
+# Create VM folder for Tanzu clusters
+resource "vsphere_folder" "tanzu_vm_folder" {
+  path          = var.vm_folder_name
+  type          = "vm"
+  datacenter_id = var.datacenter_id
+  
+  tags = var.common_tags
+}
+
+# Create custom attributes for Tanzu resources
+resource "vsphere_custom_attribute" "tanzu_cluster_attribute" {
+  name                = "tanzu-cluster"
+  managed_object_type = "VirtualMachine"
+}
+
+resource "vsphere_custom_attribute" "tanzu_role_attribute" {
+  name                = "tanzu-role"
+  managed_object_type = "VirtualMachine"
+}
+
+resource "vsphere_custom_attribute" "tanzu_environment_attribute" {
+  name                = "tanzu-environment"
+  managed_object_type = "VirtualMachine"
+}
+
+# Create vSphere tags and categories for Tanzu
+resource "vsphere_tag_category" "tanzu_cluster_category" {
+  name               = "tanzu-cluster"
+  description        = "Tanzu cluster identification"
+  cardinality        = "SINGLE"
+  associable_types   = ["VirtualMachine"]
+}
+
+resource "vsphere_tag_category" "tanzu_role_category" {
+  name               = "tanzu-role"
+  description        = "Tanzu node role identification"
+  cardinality        = "SINGLE"
+  associable_types   = ["VirtualMachine"]
+}
+
+resource "vsphere_tag_category" "tanzu_environment_category" {
+  name               = "tanzu-environment"
+  description        = "Tanzu environment identification"
+  cardinality        = "SINGLE"
+  associable_types   = ["VirtualMachine"]
+}
+
+# Create tags for management cluster
+resource "vsphere_tag" "management_cluster_tag" {
+  name        = "management"
+  category_id = vsphere_tag_category.tanzu_cluster_category.id
+  description = "Management cluster VMs"
+}
+
+# Create tags for development cluster
+resource "vsphere_tag" "dev_cluster_tag" {
+  name        = "development"
+  category_id = vsphere_tag_category.tanzu_cluster_category.id
+  description = "Development cluster VMs"
+}
+
+# Create tags for production cluster
+resource "vsphere_tag" "prod_cluster_tag" {
+  name        = "production"
+  category_id = vsphere_tag_category.tanzu_cluster_category.id
+  description = "Production cluster VMs"
+}
+
+# Create tags for node roles
+resource "vsphere_tag" "control_plane_tag" {
+  name        = "control-plane"
+  category_id = vsphere_tag_category.tanzu_role_category.id
+  description = "Control plane node VMs"
+}
+
+resource "vsphere_tag" "worker_tag" {
+  name        = "worker"
+  category_id = vsphere_tag_category.tanzu_role_category.id
+  description = "Worker node VMs"
+}
+
+# Create tags for environments
+resource "vsphere_tag" "dev_environment_tag" {
+  name        = "dev"
+  category_id = vsphere_tag_category.tanzu_environment_category.id
+  description = "Development environment"
+}
+
+resource "vsphere_tag" "prod_environment_tag" {
+  name        = "prod"
+  category_id = vsphere_tag_category.tanzu_environment_category.id
+  description = "Production environment"
+}
+
+resource "vsphere_tag" "mgmt_environment_tag" {
+  name        = "mgmt"
+  category_id = vsphere_tag_category.tanzu_environment_category.id
+  description = "Management environment"
+}
+
+# Create DRS VM groups for anti-affinity
+resource "vsphere_drs_vm_override" "tanzu_drs_override" {
+  compute_cluster_id = var.cluster_id
+  virtual_machine_id = var.template_id
+  
+  drs_enabled          = true
+  drs_automation_level = "fullyAutomated"
+}
+
+# Data source to get cluster hosts for DRS rules
+data "vsphere_host" "cluster_hosts" {
   count         = 3
-  name          = "esxi-host-${count.index + 1}.local"
+  name          = "esxi-host-${count.index + 1}"
   datacenter_id = var.datacenter_id
 }
 
-data "vsphere_datastore_cluster" "datastore_cluster" {
-  count         = 1
-  name          = "datastore-cluster-1"
-  datacenter_id = var.datacenter_id
-}
-
-# Storage policy for vSAN
-data "vsphere_storage_policy" "vsan_policy" {
-  name = "vSAN Default Storage Policy"
-}
-
-# Resource pools for different tiers
-resource "vsphere_resource_pool" "management_pool" {
-  name                    = "management-pool"
-  parent_resource_pool_id = var.resource_pool_id
-  
-  cpu_share_level      = "normal"
-  cpu_limit            = -1
-  cpu_reservation      = 0
-  cpu_expandable       = true
-  
-  memory_share_level   = "normal"
-  memory_limit         = -1
-  memory_reservation   = 0
-  memory_expandable    = true
-  
-  tags = var.common_tags
-}
-
-resource "vsphere_resource_pool" "workload_pool" {
-  name                    = "workload-pool"
-  parent_resource_pool_id = var.resource_pool_id
-  
-  cpu_share_level      = "normal"
-  cpu_limit            = -1
-  cpu_reservation      = 0
-  cpu_expandable       = true
-  
-  memory_share_level   = "normal"
-  memory_limit         = -1
-  memory_reservation   = 0
-  memory_expandable    = true
-  
-  tags = var.common_tags
-}
-
-# DRS rules for anti-affinity
+# Create DRS anti-affinity rules for control plane nodes
 resource "vsphere_compute_cluster_vm_anti_affinity_rule" "control_plane_anti_affinity" {
-  count               = 1
   name                = "control-plane-anti-affinity"
-  compute_cluster_id  = data.vsphere_compute_cluster.cluster.id
-  virtual_machine_ids = []
-  
-  depends_on = [vsphere_resource_pool.management_pool]
+  compute_cluster_id  = var.cluster_id
+  virtual_machine_ids = [] # This will be populated by the cluster modules
+  enabled             = true
+  mandatory           = true
 }
 
-# vSphere distributed switch (if available)
-data "vsphere_distributed_virtual_switch" "dvs" {
-  count         = 1
-  name          = "dvs-switch-1"
-  datacenter_id = var.datacenter_id
-}
-
-# Port groups for network segmentation
-resource "vsphere_distributed_port_group" "management_pg" {
-  count                           = 1
-  name                           = "management-portgroup"
-  distributed_virtual_switch_uuid = data.vsphere_distributed_virtual_switch.dvs[0].id
-  
-  vlan_id = 100
-  
-  active_uplinks  = ["uplink1", "uplink2"]
-  standby_uplinks = ["uplink3", "uplink4"]
-  
-  allow_promiscuous      = false
-  allow_forged_transmits = false
-  allow_mac_changes      = false
-  
-  depends_on = [data.vsphere_distributed_virtual_switch.dvs]
-}
-
-resource "vsphere_distributed_port_group" "workload_pg" {
-  count                           = 1
-  name                           = "workload-portgroup"
-  distributed_virtual_switch_uuid = data.vsphere_distributed_virtual_switch.dvs[0].id
-  
-  vlan_id = 200
-  
-  active_uplinks  = ["uplink1", "uplink2"]
-  standby_uplinks = ["uplink3", "uplink4"]
-  
-  allow_promiscuous      = false
-  allow_forged_transmits = false
-  allow_mac_changes      = false
-  
-  depends_on = [data.vsphere_distributed_virtual_switch.dvs]
-}
-
-# VM folders for organization
-resource "vsphere_folder" "management_folder" {
-  path          = "management-vms"
-  type          = "vm"
-  datacenter_id = var.datacenter_id
-  
-  tags = var.common_tags
-}
-
-resource "vsphere_folder" "workload_folder" {
-  path          = "workload-vms"
-  type          = "vm"
-  datacenter_id = var.datacenter_id
-  
-  tags = var.common_tags
-}
-
-# Custom attributes for VM categorization
-resource "vsphere_custom_attribute" "environment_attr" {
-  name                = "Environment"
-  managed_object_type = "VirtualMachine"
-}
-
-resource "vsphere_custom_attribute" "cluster_role_attr" {
-  name                = "ClusterRole"
-  managed_object_type = "VirtualMachine"
-}
-
-resource "vsphere_custom_attribute" "backup_policy_attr" {
-  name                = "BackupPolicy"
-  managed_object_type = "VirtualMachine"
-}
-
-# VM storage policy
-resource "vsphere_storage_policy" "k8s_storage_policy" {
-  name        = "k8s-storage-policy"
-  description = "Storage policy for Kubernetes nodes"
-  
-  policy_rule {
-    type = "vsan"
-    
-    vsan_rule {
-      failures_to_tolerate = 1
-      stripe_width        = 1
-      force_provisioning  = false
-      object_space_reservation = 0
-    }
-  }
-}
-
-# Output values
-output "infrastructure_info" {
-  description = "vSphere base infrastructure information"
-  value = {
-    datacenter_id           = var.datacenter_id
-    management_pool_id      = vsphere_resource_pool.management_pool.id
-    workload_pool_id        = vsphere_resource_pool.workload_pool.id
-    management_folder_id    = vsphere_folder.management_folder.id
-    workload_folder_id      = vsphere_folder.workload_folder.id
-    storage_policy_id       = vsphere_storage_policy.k8s_storage_policy.id
-    environment_attr_id     = vsphere_custom_attribute.environment_attr.id
-    cluster_role_attr_id    = vsphere_custom_attribute.cluster_role_attr.id
-    backup_policy_attr_id   = vsphere_custom_attribute.backup_policy_attr.id
-  }
-}
-
-output "network_info" {
-  description = "Network configuration information"
-  value = {
-    management_portgroup_id = try(vsphere_distributed_port_group.management_pg[0].id, null)
-    workload_portgroup_id   = try(vsphere_distributed_port_group.workload_pg[0].id, null)
-  }
-}
-
-output "resource_pools" {
-  description = "Resource pool information"
-  value = {
-    management = {
-      id   = vsphere_resource_pool.management_pool.id
-      name = vsphere_resource_pool.management_pool.name
-    }
-    workload = {
-      id   = vsphere_resource_pool.workload_pool.id
-      name = vsphere_resource_pool.workload_pool.name
-    }
-  }
-}
-
-# Data source for compute cluster (needed for DRS rules)
-data "vsphere_compute_cluster" "cluster" {
-  name          = "cluster-1"
-  datacenter_id = var.datacenter_id
+# Create DRS anti-affinity rules for worker nodes
+resource "vsphere_compute_cluster_vm_anti_affinity_rule" "worker_anti_affinity" {
+  name                = "worker-anti-affinity"
+  compute_cluster_id  = var.cluster_id
+  virtual_machine_ids = [] # This will be populated by the cluster modules
+  enabled             = true
+  mandatory           = false
 }
