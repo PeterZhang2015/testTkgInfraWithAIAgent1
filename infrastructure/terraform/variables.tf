@@ -1,24 +1,21 @@
-# VMware vSphere Variables
-# Configuration variables for Tanzu Kubernetes infrastructure deployment
+# Variables for vSphere Tanzu Kubernetes Infrastructure
+# Configure these values according to your environment
 
-# vSphere Connection Variables
+# vSphere Connection Configuration
 variable "vsphere_server" {
-  description = "vSphere server FQDN or IP address"
+  description = "vSphere server endpoint"
   type        = string
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9.-]+$", var.vsphere_server))
-    error_message = "vSphere server must be a valid hostname or IP address."
-  }
+  sensitive   = true
 }
 
 variable "vsphere_username" {
-  description = "vSphere username for authentication"
+  description = "vSphere username"
   type        = string
   sensitive   = true
 }
 
 variable "vsphere_password" {
-  description = "vSphere password for authentication"
+  description = "vSphere password"
   type        = string
   sensitive   = true
 }
@@ -29,11 +26,15 @@ variable "allow_unverified_ssl" {
   default     = true
 }
 
-# vSphere Infrastructure Variables
+# vSphere Infrastructure Configuration
 variable "vsphere_datacenter" {
   description = "vSphere datacenter name"
   type        = string
-  default     = "Datacenter"
+}
+
+variable "vsphere_cluster" {
+  description = "vSphere cluster name"
+  type        = string
 }
 
 variable "vsphere_datastore" {
@@ -46,261 +47,223 @@ variable "vsphere_network" {
   type        = string
 }
 
-variable "vsphere_resource_pool" {
-  description = "vSphere resource pool name"
-  type        = string
-  default     = "Resources"
-}
-
-variable "vm_folder" {
-  description = "VM folder path for organizing VMs"
-  type        = string
-  default     = "tanzu-k8s"
-}
-
 variable "vm_template" {
-  description = "VM template name for cluster nodes"
+  description = "VM template name for Kubernetes nodes"
   type        = string
-  default     = "photon-3-kube-v1.23.8+vmware.2-template"
+  default     = "ubuntu-20.04-kubernetes-v1.25.4"
 }
 
-# Environment Configuration
-variable "environment" {
-  description = "Environment name (dev, staging, prod)"
+variable "resource_pool_name" {
+  description = "Resource pool name for Tanzu clusters"
   type        = string
-  default     = "dev"
-  validation {
-    condition     = contains(["dev", "staging", "prod"], var.environment)
-    error_message = "Environment must be one of: dev, staging, prod."
+  default     = "tanzu-resource-pool"
+}
+
+variable "vm_folder_name" {
+  description = "VM folder name for Tanzu clusters"
+  type        = string
+  default     = "tanzu-vms"
+}
+
+# Common tags for all resources
+variable "common_tags" {
+  description = "Common tags to apply to all resources"
+  type        = map(string)
+  default = {
+    Environment = "production"
+    Project     = "tanzu-kubernetes"
+    Owner       = "platform-team"
+    ManagedBy   = "terraform"
   }
-}
-
-variable "owner" {
-  description = "Owner/team responsible for the infrastructure"
-  type        = string
-  default     = "platform-team"
-}
-
-variable "project" {
-  description = "Project name"
-  type        = string
-  default     = "tanzu-k8s-infrastructure"
 }
 
 # Network Configuration
-variable "network_cidr" {
-  description = "CIDR block for the network"
-  type        = string
-  default     = "10.0.0.0/16"
-}
-
-variable "management_subnet" {
-  description = "Subnet for management cluster"
-  type        = string
-  default     = "10.0.1.0/24"
-}
-
-variable "dev_subnet" {
-  description = "Subnet for development cluster"
-  type        = string
-  default     = "10.0.2.0/24"
-}
-
-variable "prod_subnet" {
-  description = "Subnet for production cluster"
-  type        = string
-  default     = "10.0.3.0/24"
-}
-
-# DNS Configuration
-variable "dns_servers" {
-  description = "List of DNS servers"
-  type        = list(string)
-  default     = ["8.8.8.8", "8.8.4.4"]
-}
-
-variable "domain_name" {
-  description = "Domain name for the environment"
-  type        = string
-  default     = "local.domain"
-}
-
-# NTP Configuration
-variable "ntp_servers" {
-  description = "List of NTP servers"
-  type        = list(string)
-  default     = ["pool.ntp.org", "time.google.com"]
-}
-
-# Node Configuration
-variable "node_count" {
-  description = "Number of worker nodes per cluster"
-  type        = number
-  default     = 3
-  validation {
-    condition     = var.node_count >= 1 && var.node_count <= 10
-    error_message = "Node count must be between 1 and 10."
-  }
-}
-
-variable "control_plane_count" {
-  description = "Number of control plane nodes (must be odd)"
-  type        = number
-  default     = 3
-  validation {
-    condition     = var.control_plane_count % 2 == 1 && var.control_plane_count >= 1
-    error_message = "Control plane count must be an odd number (1, 3, 5, etc.)."
-  }
-}
-
-# VM Resource Configuration
-variable "control_plane_vm_config" {
-  description = "VM configuration for control plane nodes"
+variable "network_config" {
+  description = "Network configuration for Tanzu clusters"
   type = object({
-    cpu    = number
-    memory = number
-    disk   = number
+    cluster_cidr          = string
+    service_cidr          = string
+    pod_cidr              = string
+    dns_servers           = list(string)
+    ntp_servers           = list(string)
+    proxy_config          = optional(object({
+      http_proxy  = string
+      https_proxy = string
+      no_proxy    = string
+    }))
+    load_balancer_config = object({
+      ip_pool_start = string
+      ip_pool_end   = string
+    })
   })
   default = {
-    cpu    = 2
-    memory = 8192
-    disk   = 50
-  }
-}
-
-variable "worker_vm_config" {
-  description = "VM configuration for worker nodes"
-  type = object({
-    cpu    = number
-    memory = number
-    disk   = number
-  })
-  default = {
-    cpu    = 4
-    memory = 16384
-    disk   = 100
+    cluster_cidr = "10.96.0.0/12"
+    service_cidr = "10.96.0.0/12"
+    pod_cidr     = "192.168.0.0/16"
+    dns_servers  = ["8.8.8.8", "8.8.4.4"]
+    ntp_servers  = ["pool.ntp.org"]
+    load_balancer_config = {
+      ip_pool_start = "10.10.1.100"
+      ip_pool_end   = "10.10.1.200"
+    }
   }
 }
 
 # Storage Configuration
-variable "storage_policy" {
-  description = "vSphere storage policy name"
-  type        = string
-  default     = "vSAN Default Storage Policy"
-}
-
-variable "enable_vsan" {
-  description = "Enable vSAN storage"
-  type        = bool
-  default     = true
+variable "storage_config" {
+  description = "Storage configuration for Tanzu clusters"
+  type = object({
+    storage_class     = string
+    storage_policy    = string
+    default_disk_size = string
+    reclaim_policy    = string
+  })
+  default = {
+    storage_class     = "tanzu-storage-class"
+    storage_policy    = "tanzu-storage-policy"
+    default_disk_size = "20Gi"
+    reclaim_policy    = "Delete"
+  }
 }
 
 # Security Configuration
-variable "enable_encryption" {
-  description = "Enable VM encryption"
-  type        = bool
-  default     = true
+variable "security_config" {
+  description = "Security configuration for Tanzu clusters"
+  type = object({
+    enable_pod_security_standards = bool
+    enable_network_policies       = bool
+    enable_admission_controllers  = bool
+    image_registry_config = object({
+      registry_url = string
+      username     = string
+      password     = string
+    })
+  })
+  default = {
+    enable_pod_security_standards = true
+    enable_network_policies       = true
+    enable_admission_controllers  = true
+    image_registry_config = {
+      registry_url = "registry.tanzu.vmware.com"
+      username     = ""
+      password     = ""
+    }
+  }
 }
 
-variable "enable_secure_boot" {
-  description = "Enable secure boot for VMs"
-  type        = bool
-  default     = true
+# Management Cluster Configuration
+variable "management_cluster_config" {
+  description = "Management cluster configuration"
+  type = object({
+    cluster_name        = string
+    kubernetes_version  = string
+    control_plane_count = number
+    worker_count        = number
+    control_plane_vm_config = object({
+      num_cpus          = number
+      memory_mb         = number
+      disk_size_gb      = number
+    })
+    worker_vm_config = object({
+      num_cpus          = number
+      memory_mb         = number
+      disk_size_gb      = number
+    })
+    cluster_class = string
+  })
+  default = {
+    cluster_name        = "mgmt-cluster"
+    kubernetes_version  = "v1.25.4+vmware.1"
+    control_plane_count = 3
+    worker_count        = 2
+    control_plane_vm_config = {
+      num_cpus     = 4
+      memory_mb    = 8192
+      disk_size_gb = 40
+    }
+    worker_vm_config = {
+      num_cpus     = 4
+      memory_mb    = 8192
+      disk_size_gb = 40
+    }
+    cluster_class = "tkg-vsphere-default-v1.0.0"
+  }
 }
 
-# Kubernetes Configuration
-variable "kubernetes_version" {
-  description = "Kubernetes version for the clusters"
-  type        = string
-  default     = "v1.23.8+vmware.2"
+# Development Cluster Configuration
+variable "dev_cluster_config" {
+  description = "Development cluster configuration"
+  type = object({
+    cluster_name        = string
+    kubernetes_version  = string
+    control_plane_count = number
+    worker_count        = number
+    control_plane_vm_config = object({
+      num_cpus          = number
+      memory_mb         = number
+      disk_size_gb      = number
+    })
+    worker_vm_config = object({
+      num_cpus          = number
+      memory_mb         = number
+      disk_size_gb      = number
+    })
+    cluster_class = string
+  })
+  default = {
+    cluster_name        = "dev-cluster"
+    kubernetes_version  = "v1.25.4+vmware.1"
+    control_plane_count = 3
+    worker_count        = 3
+    control_plane_vm_config = {
+      num_cpus     = 2
+      memory_mb    = 4096
+      disk_size_gb = 20
+    }
+    worker_vm_config = {
+      num_cpus     = 4
+      memory_mb    = 8192
+      disk_size_gb = 40
+    }
+    cluster_class = "tkg-vsphere-default-v1.0.0"
+  }
 }
 
-variable "pod_cidr" {
-  description = "CIDR block for pod network"
-  type        = string
-  default     = "192.168.0.0/16"
-}
-
-variable "service_cidr" {
-  description = "CIDR block for service network"
-  type        = string
-  default     = "10.96.0.0/12"
-}
-
-# Load Balancer Configuration
-variable "enable_load_balancer" {
-  description = "Enable load balancer for API server"
-  type        = bool
-  default     = true
-}
-
-variable "load_balancer_provider" {
-  description = "Load balancer provider (metallb, nsx, etc.)"
-  type        = string
-  default     = "metallb"
-}
-
-# Monitoring Configuration
-variable "enable_monitoring" {
-  description = "Enable monitoring stack"
-  type        = bool
-  default     = true
-}
-
-variable "monitoring_namespace" {
-  description = "Namespace for monitoring components"
-  type        = string
-  default     = "monitoring"
-}
-
-# Logging Configuration
-variable "enable_logging" {
-  description = "Enable logging stack"
-  type        = bool
-  default     = true
-}
-
-variable "logging_namespace" {
-  description = "Namespace for logging components"
-  type        = string
-  default     = "logging"
-}
-
-# Backup Configuration
-variable "enable_backup" {
-  description = "Enable backup solution"
-  type        = bool
-  default     = true
-}
-
-variable "backup_schedule" {
-  description = "Backup schedule (cron format)"
-  type        = string
-  default     = "0 2 * * *" # Daily at 2 AM
-}
-
-# GitOps Configuration
-variable "enable_gitops" {
-  description = "Enable GitOps with ArgoCD"
-  type        = bool
-  default     = true
-}
-
-variable "gitops_repo" {
-  description = "GitOps repository URL"
-  type        = string
-  default     = ""
-}
-
-variable "gitops_branch" {
-  description = "GitOps repository branch"
-  type        = string
-  default     = "main"
-}
-
-# Additional Tags
-variable "additional_tags" {
-  description = "Additional tags to apply to all resources"
-  type        = map(string)
-  default     = {}
+# Production Cluster Configuration
+variable "prod_cluster_config" {
+  description = "Production cluster configuration"
+  type = object({
+    cluster_name        = string
+    kubernetes_version  = string
+    control_plane_count = number
+    worker_count        = number
+    control_plane_vm_config = object({
+      num_cpus          = number
+      memory_mb         = number
+      disk_size_gb      = number
+    })
+    worker_vm_config = object({
+      num_cpus          = number
+      memory_mb         = number
+      disk_size_gb      = number
+    })
+    cluster_class = string
+  })
+  default = {
+    cluster_name        = "prod-cluster"
+    kubernetes_version  = "v1.25.4+vmware.1"
+    control_plane_count = 3
+    worker_count        = 3
+    control_plane_vm_config = {
+      num_cpus     = 4
+      memory_mb    = 8192
+      disk_size_gb = 40
+    }
+    worker_vm_config = {
+      num_cpus     = 8
+      memory_mb    = 16384
+      disk_size_gb = 80
+    }
+    cluster_class = "tkg-vsphere-default-v1.0.0"
+  }
 }
