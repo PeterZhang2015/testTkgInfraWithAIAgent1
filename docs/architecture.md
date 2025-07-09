@@ -1,4 +1,4 @@
-# Architecture Overview
+# Tanzu Kubernetes Grid Architecture Documentation
 
 ## High-Level Architecture
 
@@ -58,49 +58,95 @@
 │  │                                                             │ │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │ │
 │  │  │ Worker Node │  │ Worker Node │  │ Worker Node │        │ │
-│  │  │      1      │  │      2      │  │      3      │        │ │
+|  │  │      1      │  │      2      │  │      3      │        │ │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘        │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Infrastructure Components
+## Architecture Components
 
-### vSphere Infrastructure
-- **ESXi Hosts**: Multiple ESXi hosts for high availability and resource distribution
-- **vCenter Server**: Centralized management in HA configuration
-- **Networking**: NSX-T or vSphere Standard/Distributed Switch for network virtualization
-- **Storage**: vSAN or external shared storage for persistent data
+### Infrastructure Layer
+- **vSphere Infrastructure**: VMware vSphere 7.0+ with ESXi hosts
+- **vCenter Server**: High availability configuration for management
+- **Networking**: NSX-T or vSphere Standard/Distributed Switch
+- **Storage**: vSAN or shared storage (NFS/iSCSI)
 
-### Tanzu Kubernetes Grid
-- **Management Cluster**: 3-node HA cluster for managing workload clusters
-- **Development Cluster**: Development environment with appropriate resource allocation
-- **Production Cluster**: Production-grade cluster with strict security and monitoring
+### Kubernetes Layer
+- **Management Cluster**: 3-node HA control plane for cluster lifecycle management
+- **Workload Clusters**: Separate clusters for development and production workloads
+- **Network Segregation**: Separate networks for management and workload traffic
 
-## High Availability Design
-
-### Infrastructure HA
-- vSphere HA for automatic VM restart
-- Redundant storage with no single point of failure
-- Network redundancy with multiple paths
-- Power redundancy with UPS systems
-
-### Kubernetes HA
-- 3-node control plane for etcd quorum
-- External load balancer for API servers
-- Worker nodes distributed across ESXi hosts
-- Proper pod disruption budgets
+### High Availability Design
+- **Control Plane HA**: 3-node etcd cluster with external load balancer
+- **Infrastructure HA**: Multi-host deployment with anti-affinity rules
+- **Network HA**: Redundant network paths and load balancing
+- **Storage HA**: Distributed storage with replication
 
 ## Security Framework
 
 ### Cluster Security
-- RBAC for access control
+- Role-based access control (RBAC)
 - Network policies for micro-segmentation
-- Pod security standards
+- Pod security standards for runtime constraints
 - Admission controllers for policy enforcement
 
-### Image Security
-- Private container registry with vulnerability scanning
-- Image signing for integrity verification
-- Runtime security monitoring
-- Regular compliance assessments
+### Infrastructure Security
+- vSphere security hardening
+- Network segmentation with NSX-T
+- Certificate management with cert-manager
+- Secrets management with external secrets operators
+
+## Monitoring and Observability
+
+### Metrics Collection
+- Prometheus for metrics aggregation
+- Grafana for visualization
+- Custom metrics for application monitoring
+- Node and cluster health monitoring
+
+### Logging
+- Centralized logging with Fluentd/Fluent Bit
+- Log aggregation and indexing
+- Audit logging for security compliance
+- Automated log lifecycle management
+
+### Alerting
+- Alertmanager for alert routing
+- Integration with external notification systems
+- Escalation policies and runbooks
+- SLA monitoring and reporting
+
+## Disaster Recovery Strategy
+
+### Backup Strategy
+- Automated etcd snapshots
+- Velero for Kubernetes resource backups
+- Infrastructure configuration backups
+- Application data backups
+
+### Recovery Procedures
+- Documented recovery procedures
+- Automated cluster rebuild capabilities
+- Application restoration from GitOps
+- Regular disaster recovery testing
+
+## Operational Considerations
+
+### Scaling Strategy
+- Cluster autoscaling for dynamic resource allocation
+- Horizontal pod autoscaling for application scaling
+- Vertical pod autoscaling for resource optimization
+- Multi-zone deployment for resilience
+
+### Update Strategy
+- Rolling updates for minimal downtime
+- Blue-green deployments for critical applications
+- Canary deployments for gradual rollouts
+- Automated rollback procedures
+
+### Cost Optimization
+- Resource quotas and limits
+- Spot instances for non-critical workloads
+- Storage optimization with lifecycle policies
+- Right-sizing with monitoring feedback
