@@ -1,0 +1,70 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: ClusterClass
+metadata:
+  name: dev-cluster-class
+  namespace: default
+  labels:
+    cluster-role: development
+spec:
+  controlPlane:
+    ref:
+      apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+      kind: KubeadmControlPlaneTemplate
+      name: dev-control-plane
+    machineInfrastructure:
+      ref:
+        kind: VSphereMachineTemplate
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        name: dev-control-plane
+  infrastructure:
+    ref:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: VSphereClusterTemplate
+      name: dev-cluster
+  workers:
+    machineDeployments:
+    - class: dev-worker
+      template:
+        bootstrap:
+          ref:
+            apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+            kind: KubeadmConfigTemplate
+            name: dev-worker
+        infrastructure:
+          ref:
+            apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+            kind: VSphereMachineTemplate
+            name: dev-worker
+  variables:
+  - name: imageRepository
+    required: true
+    schema:
+      openAPIV3Schema:
+        type: string
+        default: "registry.tkg.vmware.run"
+  - name: etcdImageTag
+    required: true
+    schema:
+      openAPIV3Schema:
+        type: string
+        default: "v3.5.9_vmware.1"
+  - name: coreDNSImageTag
+    required: true
+    schema:
+      openAPIV3Schema:
+        type: string
+        default: "v1.10.1_vmware.1"
+  - name: antreaConfigMap
+    required: false
+    schema:
+      openAPIV3Schema:
+        type: string
+        default: |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: antrea-config
+            namespace: kube-system
+          data:
+            antrea-agent.conf: |
+              featureGates

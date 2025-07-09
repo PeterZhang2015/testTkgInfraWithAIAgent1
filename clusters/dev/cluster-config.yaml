@@ -1,0 +1,119 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: dev-cluster
+  namespace: default
+  labels:
+    cluster-role: development
+    environment: dev
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+      - 192.168.0.0/16
+    services:
+      cidrBlocks:
+      - 10.96.0.0/12
+  topology:
+    class: tkg-vsphere-default-v1.0.0
+    version: v1.27.5+vmware.1-tkg.1
+    controlPlane:
+      replicas: 1
+      metadata:
+        annotations:
+          cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size: "1"
+          cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size: "3"
+        labels:
+          cluster-role: development
+    workers:
+      machineDeployments:
+      - class: tkg-worker
+        name: md-0
+        replicas: 3
+        metadata:
+          annotations:
+            cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size: "3"
+            cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size: "10"
+          labels:
+            cluster-role: development
+            nodepool: worker
+    variables:
+    - name: vmClass
+      value: best-effort-medium
+    - name: storageClass
+      value: default
+    - name: defaultStorageClass
+      value: default
+    - name: nodePoolLabels
+      value:
+      - key: environment
+        value: dev
+      - key: cluster-role
+        value: workload
+    - name: network
+      value:
+        cni:
+          name: antrea
+        serviceDomain: cluster.local
+        pods:
+          cidrBlocks:
+          - 192.168.0.0/16
+        services:
+          cidrBlocks:
+          - 10.96.0.0/12
+    - name: controlPlaneEndpoint
+      value:
+        host: dev-cluster.example.com
+        port: 6443
+    - name: auditLogging
+      value:
+        enabled: true
+        config:
+          apiVersion: audit.k8s.io/v1
+          kind: Policy
+          rules:
+          - level: Request
+            resources:
+            - group: ""
+              resources: ["pods", "services", "configmaps", "secrets"]
+            - group: "apps"
+              resources: ["deployments", "replicasets"]
+    - name: podSecurityStandard
+      value:
+        audit: restricted
+        warn: restricted
+        enforce: baseline
+        deactivated: false
+    - name: apiServerEndpoint
+      value:
+        host: dev-cluster.example.com
+        port: 6443
+    - name: vcenter
+      value:
+        cloneMode: fullClone
+        datacenter: "/datacenter1"
+        datastore: "/datacenter1/datastore/datastore1"
+        folder: "/datacenter1/vm/tkg/dev"
+        network: "/datacenter1/network/VM Network"
+        resourcePool: "/datacenter1/host/cluster1/Resources/tkg/dev"
+        server: vcenter.example.com
+        storagePolicyID: ""
+        template: "/datacenter1/vm/tkg/ubuntu-2004-kube-v1.27.5+vmware.1-tkg.1"
+        tlsThumbprint: "XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX:XX"
+    - name: controlPlaneCertificateRotation
+      value:
+        activate: true
+        daysBefore: 90
+    - name: etcdEncryption
+      value:
+        activate: true
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dev-cluster-vsphere-creds
+  namespace: default
+type: Opaque
+stringData:
+  username: ${VSPHERE_USERNAME}
+  password: ${VSPHERE_PASSWORD}
