@@ -1,110 +1,199 @@
-# Prerequisites
+# Prerequisites for Tanzu Kubernetes Grid Deployment
 
-## Hardware Requirements
+## Infrastructure Requirements
 
-### vSphere Infrastructure
-- **ESXi Hosts**: Minimum 3 hosts for HA
-- **CPU**: 64+ cores per host with hyperthreading
-- **Memory**: 512GB+ RAM per host
-- **Storage**: 2TB+ SSD storage per host
-- **Network**: 10GbE or faster network adapters
+### VMware vSphere Environment
+- **vSphere Version**: 7.0 or later
+- **vCenter Server**: 7.0 or later with HA configuration
+- **ESXi Hosts**: Minimum 3 hosts for HA, 8.0 or later recommended
+- **Hardware**: 
+  - CPU: Intel VT-x or AMD-V enabled
+  - Memory: Minimum 256GB per ESXi host
+  - Storage: SSD recommended, 10,000 IOPS minimum
+  - Network: 10GbE recommended
 
-### Minimum Resource Allocation
-- **Management Cluster**: 3 control plane nodes (4 vCPU, 16GB RAM each)
-- **Development Cluster**: 3 control plane + 3 worker nodes (4 vCPU, 16GB RAM each)
-- **Production Cluster**: 3 control plane + 3 worker nodes (8 vCPU, 32GB RAM each)
+### Storage Requirements
+- **Shared Storage**: 
+  - vSAN 7.0+ (recommended)
+  - NFS 4.1 or later
+  - iSCSI with multipath support
+  - Minimum 50TB for production workloads
+- **Storage Policies**: 
+  - Kubernetes persistent volumes
+  - Backup storage for etcd and applications
+  - High-performance storage for databases
 
-## Software Requirements
+### Network Requirements
+- **IP Address Allocation**:
+  - Management network: /24 subnet minimum
+  - Workload network: /22 subnet minimum
+  - Load balancer pool: /28 subnet minimum
+  - Ingress/egress: /28 subnet minimum
+- **DNS**: Forward and reverse DNS resolution
+- **NTP**: Time synchronization for all components
+- **Firewall**: Required ports for Kubernetes and vSphere communication
 
-### VMware Components
-- vSphere 7.0 U3 or later
-- vCenter Server 7.0 U3 or later
-- NSX-T 3.2 or later (optional)
-- vSAN 7.0 U3 or later (if using vSAN)
+## Required Tools and Dependencies
 
-### Operating System
-- Ubuntu 20.04 LTS or later
-- VMware Photon OS 4.0 or later
-- CentOS 8 or later
+### Core Tools
+- **Tanzu CLI**: Latest version with all required plugins
+- **kubectl**: Version compatible with target Kubernetes version
+- **Helm**: Version 3.x for package management
+- **Docker**: For local development and testing
+- **Git**: For version control and GitOps
 
-## Network Requirements
+### Infrastructure Tools
+- **Terraform**: 1.5.x or later for infrastructure provisioning
+- **Ansible**: 2.9.x or later for configuration management
+- **Packer**: For VM template creation
+- **yq**: YAML processor for configuration management
 
-### Network Segments
-- Management network (for cluster communication)
-- Workload network (for application traffic)
-- Load balancer network (for external access)
-- Storage network (for vSAN or shared storage)
+### VMware-Specific Tools
+- **vSphere Client**: Web-based or thick client for vCenter management
+- **govc**: vSphere CLI for automation
+- **PowerCLI**: PowerShell cmdlets for vSphere (if using PowerShell)
+- **NSX-T CLI**: For network configuration (if using NSX-T)
 
-### Firewall Rules
-- ESXi management ports (443, 902, 5988)
-- vCenter Server ports (443, 9443)
-- Kubernetes API server (6443)
-- etcd client/peer communication (2379, 2380)
-- kubelet (10250)
-- NodePort services (30000-32767)
+### Monitoring and Observability Tools
+- **Prometheus**: For metrics collection and alerting
+- **Grafana**: For visualization and dashboards
+- **Alertmanager**: For alert routing and management
+- **Fluentd/Fluent Bit**: For log collection and forwarding
 
-## DNS and NTP
+### Security Tools
+- **cert-manager**: For certificate management
+- **Vault**: For secrets management (optional)
+- **Falco**: For runtime security monitoring
+- **Twistlock/Prisma Cloud**: For container security
+
+## System Requirements
+
+### Development Environment
+- **Operating System**: Linux (Ubuntu 20.04+ recommended) or macOS
+- **CPU**: 4 cores minimum, 8+ recommended
+- **Memory**: 16GB minimum, 32GB+ recommended
+- **Storage**: 500GB SSD minimum
+- **Network**: Stable internet connection for downloading dependencies
+
+### CI/CD Environment
+- **Build Agents**: Kubernetes-based or VM-based
+- **Container Registry**: Harbor, Docker Hub, or AWS ECR
+- **Git Repository**: GitHub, GitLab, or Bitbucket
+- **Pipeline Tools**: Tekton, Jenkins, or GitLab CI
+
+## Network Configuration
+
+### Required Ports
+```
+Kubernetes API Server: 6443
+etcd: 2379-2380
+Kubelet: 10250
+NodePort Services: 30000-32767
+Ingress Controller: 80, 443
+vSphere vCenter: 443
+NSX-T Manager: 443
+```
 
 ### DNS Configuration
-- Forward and reverse DNS resolution
+- Kubernetes cluster domain: cluster.local
+- External DNS for ingress endpoints
+- DNS resolution for all nodes and services
 - Wildcard DNS for application ingress
-- DNS records for load balancers
 
-### NTP Configuration
-- Consistent time synchronization across all components
-- NTP server accessibility from all nodes
+### Load Balancer Configuration
+- External load balancer for Kubernetes API
+- Layer 4 load balancing for control plane
+- Health checks for API server endpoints
+- Session affinity for consistent routing
 
-## SSL Certificates
+## Security Requirements
 
-### Certificate Requirements
-- Valid SSL certificates for vCenter Server
-- Wildcard certificates for Kubernetes ingress
-- Certificate authority for internal communication
+### Authentication and Authorization
+- **RBAC**: Role-based access control configuration
+- **OIDC**: Integration with identity providers
+- **Service Accounts**: Proper service account configuration
+- **Network Policies**: Kubernetes network segmentation
 
-## Storage Requirements
+### Certificate Management
+- **TLS Certificates**: For all cluster communications
+- **Certificate Rotation**: Automated certificate lifecycle
+- **CA Certificates**: Trusted certificate authorities
+- **Client Certificates**: For user authentication
 
-### Persistent Storage
-- vSAN or external shared storage
-- Storage classes for different performance tiers
-- Snapshot and backup capabilities
-
-### Backup Storage
-- Separate backup storage for cluster backups
-- Offsite backup for disaster recovery
-
-## User Access and Permissions
-
-### vSphere Permissions
-- Administrator access to vCenter Server
-- Appropriate permissions for Tanzu service accounts
-- Network and storage permissions
-
-### Kubernetes Access
-- RBAC configuration for user access
-- Service account management
-- Secret and ConfigMap permissions
-
-## Monitoring and Logging
-
-### Monitoring Infrastructure
-- Prometheus and Grafana setup
-- Persistent storage for metrics
-- Alerting infrastructure
-
-### Logging Infrastructure
-- Centralized logging system
-- Log retention policies
-- Log analysis capabilities
+### Network Security
+- **Firewall Rules**: Proper ingress and egress rules
+- **Network Segmentation**: Isolated network zones
+- **Encryption**: TLS encryption for all communications
+- **VPN Access**: Secure remote access to management networks
 
 ## Backup and Recovery
 
 ### Backup Strategy
-- Regular etcd backups
-- VM-level backups
-- Application-level backups
-- Configuration backups
+- **etcd Snapshots**: Daily automated backups
+- **Velero**: Kubernetes resource and volume backups
+- **Infrastructure Backups**: VM and configuration backups
+- **Application Data**: Database and persistent volume backups
 
 ### Recovery Testing
-- Regular recovery testing procedures
-- Documented recovery processes
-- Recovery time objectives (RTO) and recovery point objectives (RPO)
+- **Disaster Recovery**: Regular DR testing procedures
+- **Backup Validation**: Automated backup verification
+- **Recovery Time Objectives**: Documented RTO/RPO requirements
+- **Runbooks**: Detailed recovery procedures
+
+## Monitoring and Alerting
+
+### Metrics Collection
+- **Infrastructure Metrics**: CPU, memory, storage, network
+- **Kubernetes Metrics**: Pod, node, and cluster metrics
+- **Application Metrics**: Custom application metrics
+- **Business Metrics**: KPIs and SLA metrics
+
+### Alerting Configuration
+- **Critical Alerts**: System-wide failures and outages
+- **Warning Alerts**: Resource utilization and performance
+- **Escalation Policies**: Automated alert routing
+- **Notification Channels**: Email, Slack, PagerDuty
+
+## Compliance and Governance
+
+### Security Standards
+- **CIS Benchmarks**: Kubernetes and infrastructure hardening
+- **NIST Framework**: Security controls and compliance
+- **Industry Standards**: Specific compliance requirements
+- **Audit Logging**: Comprehensive audit trail
+
+### Change Management
+- **GitOps**: Infrastructure and application as code
+- **Approval Processes**: Change request workflows
+- **Rollback Procedures**: Automated rollback capabilities
+- **Documentation**: Comprehensive documentation standards
+
+## Pre-Deployment Checklist
+
+### Infrastructure Validation
+- [ ] vSphere environment configured and tested
+- [ ] Network connectivity verified
+- [ ] Storage provisioned and configured
+- [ ] DNS resolution working
+- [ ] NTP synchronization configured
+- [ ] Firewall rules implemented
+- [ ] Load balancer configured
+- [ ] SSL certificates prepared
+
+### Security Validation
+- [ ] RBAC policies defined
+- [ ] Network policies created
+- [ ] Security scanning tools configured
+- [ ] Backup strategy implemented
+- [ ] Monitoring and alerting configured
+- [ ] Compliance requirements verified
+- [ ] Security testing completed
+
+### Operational Readiness
+- [ ] Runbooks created and tested
+- [ ] Monitoring dashboards configured
+- [ ] Alerting policies implemented
+- [ ] Backup and recovery tested
+- [ ] Documentation completed
+- [ ] Team training completed
+- [ ] Support procedures established
