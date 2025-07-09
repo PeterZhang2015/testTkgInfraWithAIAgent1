@@ -1,37 +1,46 @@
-# VMware vSphere Tanzu Kubernetes Infrastructure
-# Main Terraform configuration for deploying HA Tanzu Kubernetes Grid
+# Main Terraform configuration for Tanzu Kubernetes Infrastructure
+# This file orchestrates the deployment of the complete vSphere Tanzu setup
 
 terraform {
   required_version = ">= 1.0"
   required_providers {
     vsphere = {
       source  = "hashicorp/vsphere"
-      version = "~> 2.2"
+      version = "~> 2.0"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.16"
+      version = "~> 2.0"
     }
     helm = {
       source  = "hashicorp/helm"
-      version = "~> 2.7"
+      version = "~> 2.0"
     }
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.1"
+      version = "~> 3.0"
     }
   }
 }
 
-# Configure vSphere provider
+# Configure the vSphere provider
 provider "vsphere" {
+  vsphere_server       = var.vsphere_server
   user                 = var.vsphere_username
   password             = var.vsphere_password
-  vsphere_server       = var.vsphere_server
   allow_unverified_ssl = var.allow_unverified_ssl
 }
 
-# Data sources for vSphere resources
+# Local values for common configuration
+locals {
+  common_tags = {
+    Environment = var.environment
+    Project     = "tanzu-kubernetes-infrastructure"
+    ManagedBy   = "terraform"
+  }
+}
+
+# Data sources for vSphere objects
 data "vsphere_datacenter" "datacenter" {
   name = var.vsphere_datacenter
 }
@@ -41,111 +50,109 @@ data "vsphere_datastore" "datastore" {
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
-data "vsphere_compute_cluster" "cluster" {
-  name          = var.vsphere_cluster
-  datacenter_id = data.vsphere_datacenter.datacenter.id
-}
-
 data "vsphere_network" "network" {
   name          = var.vsphere_network
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
-data "vsphere_virtual_machine" "template" {
-  name          = var.vm_template
+data "vsphere_compute_cluster" "cluster" {
+  name          = var.vsphere_cluster
   datacenter_id = data.vsphere_datacenter.datacenter.id
 }
 
-# Module for vSphere base infrastructure
+data "vsphere_resource_pool" "resource_pool" {
+  name                = var.vsphere_resource_pool
+  datacenter_id       = data.vsphere_datacenter.datacenter.id
+  parent_resource_pool_id = data.vsphere_compute_cluster.cluster.resource_pool_id
+}
+
+# Module calls for different components
 module "vsphere_base" {
   source = "./modules/vsphere-base"
-
-  datacenter_id = data.vsphere_datacenter.datacenter.id
-  datastore_id  = data.vsphere_datastore.datastore.id
-  cluster_id    = data.vsphere_compute_cluster.cluster.id
-  network_id    = data.vsphere_network.network.id
-  template_id   = data.vsphere_virtual_machine.template.id
-
-  resource_pool_name = var.resource_pool_name
-  vm_folder_name     = var.vm_folder_name
   
-  common_tags = var.common_tags
+  datacenter_id     = data.vsphere_datacenter.datacenter.id
+  datastore_id      = data.vsphere_datastore.datastore.id
+  network_id        = data.vsphere_network.network.id
+  resource_pool_id  = data.vsphere_resource_pool.resource_pool.id
+  
+  environment = var.environment
+  common_tags = local.common_tags
 }
 
-# Module for networking configuration
 module "networking" {
   source = "./modules/networking"
-
+  
+  depends_on = [module.vsphere_base]
+  
   datacenter_id = data.vsphere_datacenter.datacenter.id
   cluster_id    = data.vsphere_compute_cluster.cluster.id
   
-  network_config = var.network_config
-  common_tags    = var.common_tags
+  environment = var.environment
+  common_tags = local.common_tags
 }
 
-# Module for storage configuration
 module "storage" {
   source = "./modules/storage"
-
-  datacenter_id = data.vsphere_datacenter.datacenter.id
-  cluster_id    = data.vsphere_compute_cluster.cluster.id
   
-  storage_config = var.storage_config
-  common_tags    = var.common_tags
+  depends_on = [module.vsphere_base]
+  
+  datacenter_id = data.vsphere_datacenter.datacenter.id
+  datastore_id  = data.vsphere_datastore.datastore.id
+  
+  environment = var.environment
+  common_tags = local.common_tags
 }
 
-# Module for security configuration
 module "security" {
   source = "./modules/security"
-
+  
+  depends_on = [module.vsphere_base, module.networking]
+  
   datacenter_id = data.vsphere_datacenter.datacenter.id
-  cluster_id    = data.vsphere_compute_cluster.cluster.id
   
-  security_config = var.security_config
-  common_tags     = var.common_tags
+  environment = var.environment
+  common_tags = local.common_tags
 }
 
-# Local values for common configuration
-locals {
-  common_vm_config = {
-    datacenter_id = data.vsphere_datacenter.datacenter.id
-    datastore_id  = data.vsphere_datastore.datastore.id
-    cluster_id    = data.vsphere_compute_cluster.cluster.id
-    network_id    = data.vsphere_network.network.id
-    template_id   = data.vsphere_virtual_machine.template.id
-    
-    resource_pool_id = module.vsphere_base.resource_pool_id
-    vm_folder_id     = module.vsphere_base.vm_folder_id
-  }
-}
-
-# Management cluster environment
-module "management_cluster" {
+# Environment-specific modules
+module "management_environment" {
   source = "./environments/mgmt"
-
-  vm_config   = local.common_vm_config
-  cluster_config = var.management_cluster_config
-  common_tags = var.common_tags
+  
+  depends_on = [module.vsphere_base, module.networking, module.storage, module.security]
+  
+  datacenter_id    = data.vsphere_datacenter.datacenter.id
+  datastore_id     = data.vsphere_datastore.datastore.id
+  network_id       = data.vsphere_network.network.id
+  resource_pool_id = data.vsphere_resource_pool.resource_pool.id
+  
+  environment = "mgmt"
+  common_tags = local.common_tags
 }
 
-# Development cluster environment
-module "dev_cluster" {
+module "development_environment" {
   source = "./environments/dev"
-
-  vm_config      = local.common_vm_config
-  cluster_config = var.dev_cluster_config
-  common_tags    = var.common_tags
   
-  depends_on = [module.management_cluster]
+  depends_on = [module.management_environment]
+  
+  datacenter_id    = data.vsphere_datacenter.datacenter.id
+  datastore_id     = data.vsphere_datastore.datastore.id
+  network_id       = data.vsphere_network.network.id
+  resource_pool_id = data.vsphere_resource_pool.resource_pool.id
+  
+  environment = "dev"
+  common_tags = local.common_tags
 }
 
-# Production cluster environment
-module "prod_cluster" {
+module "production_environment" {
   source = "./environments/prod"
-
-  vm_config      = local.common_vm_config
-  cluster_config = var.prod_cluster_config
-  common_tags    = var.common_tags
   
-  depends_on = [module.management_cluster]
+  depends_on = [module.management_environment]
+  
+  datacenter_id    = data.vsphere_datacenter.datacenter.id
+  datastore_id     = data.vsphere_datastore.datastore.id
+  network_id       = data.vsphere_network.network.id
+  resource_pool_id = data.vsphere_resource_pool.resource_pool.id
+  
+  environment = "prod"
+  common_tags = local.common_tags
 }
