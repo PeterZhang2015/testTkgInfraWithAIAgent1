@@ -1,184 +1,179 @@
-# Outputs for vSphere Tanzu Kubernetes Infrastructure
-# These outputs provide important information about the deployed infrastructure
+# Outputs for Tanzu Kubernetes Infrastructure
 
 # vSphere Infrastructure Outputs
 output "vsphere_datacenter_id" {
-  description = "ID of the vSphere datacenter"
+  description = "vSphere datacenter ID"
   value       = data.vsphere_datacenter.datacenter.id
 }
 
-output "vsphere_cluster_id" {
-  description = "ID of the vSphere cluster"
-  value       = data.vsphere_compute_cluster.cluster.id
-}
-
 output "vsphere_datastore_id" {
-  description = "ID of the vSphere datastore"
+  description = "vSphere datastore ID"
   value       = data.vsphere_datastore.datastore.id
 }
 
 output "vsphere_network_id" {
-  description = "ID of the vSphere network"
+  description = "vSphere network ID"
   value       = data.vsphere_network.network.id
 }
 
-# Base Infrastructure Outputs
-output "resource_pool_id" {
-  description = "ID of the created resource pool"
-  value       = module.vsphere_base.resource_pool_id
+output "vsphere_resource_pool_id" {
+  description = "vSphere resource pool ID"
+  value       = data.vsphere_resource_pool.resource_pool.id
 }
 
-output "vm_folder_id" {
-  description = "ID of the created VM folder"
-  value       = module.vsphere_base.vm_folder_id
+# Module Outputs
+output "vsphere_base_info" {
+  description = "vSphere base infrastructure information"
+  value       = module.vsphere_base
 }
 
-# Management Cluster Outputs
-output "management_cluster_name" {
-  description = "Name of the management cluster"
-  value       = module.management_cluster.cluster_name
+output "networking_info" {
+  description = "Networking configuration information"
+  value       = module.networking
 }
 
-output "management_cluster_endpoint" {
-  description = "API endpoint of the management cluster"
-  value       = module.management_cluster.cluster_endpoint
+output "storage_info" {
+  description = "Storage configuration information"
+  value       = module.storage
+}
+
+output "security_info" {
+  description = "Security configuration information"
+  value       = module.security
+}
+
+# Management Environment Outputs
+output "management_cluster_info" {
+  description = "Management cluster information"
+  value       = module.management_environment
   sensitive   = true
 }
 
-output "management_cluster_ca_certificate" {
-  description = "CA certificate of the management cluster"
-  value       = module.management_cluster.cluster_ca_certificate
+# Development Environment Outputs
+output "development_cluster_info" {
+  description = "Development cluster information"
+  value       = module.development_environment
   sensitive   = true
 }
 
-output "management_cluster_status" {
-  description = "Status of the management cluster"
-  value       = module.management_cluster.cluster_status
-}
-
-# Development Cluster Outputs
-output "dev_cluster_name" {
-  description = "Name of the development cluster"
-  value       = module.dev_cluster.cluster_name
-}
-
-output "dev_cluster_endpoint" {
-  description = "API endpoint of the development cluster"
-  value       = module.dev_cluster.cluster_endpoint
+# Production Environment Outputs
+output "production_cluster_info" {
+  description = "Production cluster information"
+  value       = module.production_environment
   sensitive   = true
 }
 
-output "dev_cluster_ca_certificate" {
-  description = "CA certificate of the development cluster"
-  value       = module.dev_cluster.cluster_ca_certificate
-  sensitive   = true
+# Cluster Configuration Summary
+output "cluster_summary" {
+  description = "Summary of all cluster configurations"
+  value = {
+    management = {
+      name                = var.management_cluster_config.name
+      control_plane_count = var.management_cluster_config.control_plane_count
+      worker_count        = var.management_cluster_config.worker_count
+      environment         = "mgmt"
+    }
+    development = {
+      name                = var.dev_cluster_config.name
+      control_plane_count = var.dev_cluster_config.control_plane_count
+      worker_count        = var.dev_cluster_config.worker_count
+      environment         = "dev"
+    }
+    production = {
+      name                = var.prod_cluster_config.name
+      control_plane_count = var.prod_cluster_config.control_plane_count
+      worker_count        = var.prod_cluster_config.worker_count
+      environment         = "prod"
+    }
+  }
 }
 
-output "dev_cluster_status" {
-  description = "Status of the development cluster"
-  value       = module.dev_cluster.cluster_status
-}
-
-# Production Cluster Outputs
-output "prod_cluster_name" {
-  description = "Name of the production cluster"
-  value       = module.prod_cluster.cluster_name
-}
-
-output "prod_cluster_endpoint" {
-  description = "API endpoint of the production cluster"
-  value       = module.prod_cluster.cluster_endpoint
-  sensitive   = true
-}
-
-output "prod_cluster_ca_certificate" {
-  description = "CA certificate of the production cluster"
-  value       = module.prod_cluster.cluster_ca_certificate
-  sensitive   = true
-}
-
-output "prod_cluster_status" {
-  description = "Status of the production cluster"
-  value       = module.prod_cluster.cluster_status
-}
-
-# Networking Outputs
+# Network Configuration Outputs
 output "network_configuration" {
   description = "Network configuration details"
   value = {
-    cluster_cidr = var.network_config.cluster_cidr
-    service_cidr = var.network_config.service_cidr
-    pod_cidr     = var.network_config.pod_cidr
-    dns_servers  = var.network_config.dns_servers
-    load_balancer_pool = {
-      start = var.network_config.load_balancer_config.ip_pool_start
-      end   = var.network_config.load_balancer_config.ip_pool_end
-    }
+    service_cidr   = var.network_config.service_cidr
+    pod_cidr       = var.network_config.pod_cidr
+    service_domain = var.network_config.service_domain
   }
 }
 
-# Storage Outputs
+# Storage Configuration Outputs
 output "storage_configuration" {
   description = "Storage configuration details"
   value = {
-    storage_class     = var.storage_config.storage_class
-    storage_policy    = var.storage_config.storage_policy
-    default_disk_size = var.storage_config.default_disk_size
-    reclaim_policy    = var.storage_config.reclaim_policy
+    storage_class       = var.storage_config.storage_class
+    volume_binding_mode = var.storage_config.volume_binding_mode
+    reclaim_policy      = var.storage_config.reclaim_policy
   }
 }
 
-# Security Outputs
+# Security Configuration Outputs
 output "security_configuration" {
-  description = "Security configuration status"
+  description = "Security configuration details"
   value = {
-    pod_security_standards_enabled = var.security_config.enable_pod_security_standards
-    network_policies_enabled       = var.security_config.enable_network_policies
-    admission_controllers_enabled  = var.security_config.enable_admission_controllers
-    image_registry_url            = var.security_config.image_registry_config.registry_url
+    pod_security_standards = var.security_config.enable_pod_security_standards
+    network_policies      = var.security_config.enable_network_policies
+    rbac                  = var.security_config.enable_rbac
+    admission_controllers = var.security_config.enable_admission_controllers
   }
 }
 
-# Kubeconfig Access Information
-output "kubeconfig_commands" {
-  description = "Commands to get kubeconfig for each cluster"
+# Monitoring Configuration Outputs
+output "monitoring_configuration" {
+  description = "Monitoring configuration details"
   value = {
-    management_cluster = "tanzu management-cluster kubeconfig get ${module.management_cluster.cluster_name} --admin"
-    dev_cluster       = "tanzu cluster kubeconfig get ${module.dev_cluster.cluster_name} --admin"
-    prod_cluster      = "tanzu cluster kubeconfig get ${module.prod_cluster.cluster_name} --admin"
+    prometheus      = var.monitoring_config.enable_prometheus
+    grafana        = var.monitoring_config.enable_grafana
+    alerting       = var.monitoring_config.enable_alerting
+    retention_days = var.monitoring_config.retention_days
   }
 }
 
-# Cluster Information Summary
-output "cluster_summary" {
-  description = "Summary of all deployed clusters"
+# GitOps Configuration Outputs
+output "gitops_configuration" {
+  description = "GitOps configuration details"
   value = {
-    management_cluster = {
-      name               = module.management_cluster.cluster_name
-      kubernetes_version = var.management_cluster_config.kubernetes_version
-      control_plane_count = var.management_cluster_config.control_plane_count
-      worker_count       = var.management_cluster_config.worker_count
-      status            = module.management_cluster.cluster_status
-    }
-    dev_cluster = {
-      name               = module.dev_cluster.cluster_name
-      kubernetes_version = var.dev_cluster_config.kubernetes_version
-      control_plane_count = var.dev_cluster_config.control_plane_count
-      worker_count       = var.dev_cluster_config.worker_count
-      status            = module.dev_cluster.cluster_status
-    }
-    prod_cluster = {
-      name               = module.prod_cluster.cluster_name
-      kubernetes_version = var.prod_cluster_config.kubernetes_version
-      control_plane_count = var.prod_cluster_config.control_plane_count
-      worker_count       = var.prod_cluster_config.worker_count
-      status            = module.prod_cluster.cluster_status
-    }
+    argocd     = var.gitops_config.enable_argocd
+    flux       = var.gitops_config.enable_flux
+    git_repo   = var.gitops_config.git_repo_url
+    git_branch = var.gitops_config.git_branch
   }
 }
 
-# Infrastructure Tags
-output "applied_tags" {
-  description = "Tags applied to all resources"
-  value       = var.common_tags
+# Backup Configuration Outputs
+output "backup_configuration" {
+  description = "Backup configuration details"
+  value = {
+    velero         = var.backup_config.enable_velero
+    etcd_backup    = var.backup_config.enable_etcd_backup
+    schedule       = var.backup_config.backup_schedule
+    retention_days = var.backup_config.retention_days
+  }
+}
+
+# Common Tags Output
+output "common_tags" {
+  description = "Common tags applied to all resources"
+  value       = local.common_tags
+}
+
+# Deployment Information
+output "deployment_info" {
+  description = "Deployment information and next steps"
+  value = {
+    terraform_version = ">=1.0"
+    kubernetes_version = var.kubernetes_version
+    tanzu_version     = var.tanzu_version
+    environment       = var.environment
+    deployment_date   = timestamp()
+    next_steps = [
+      "1. Verify vSphere infrastructure deployment",
+      "2. Deploy Tanzu management cluster",
+      "3. Deploy workload clusters (dev/prod)",
+      "4. Configure GitOps with ArgoCD",
+      "5. Set up monitoring and alerting",
+      "6. Configure backup and disaster recovery"
+    ]
+  }
 }
